@@ -9,7 +9,7 @@ libtermkey
 libtree-sitter libvterm luajit luajit2.1-luv msgpack unibilium xsel
 
 Set:
-Nerfont in Terminal
+Nerdont in Terminal
 
 Copy 
 cp -rf nvim  ~./config/nvim
