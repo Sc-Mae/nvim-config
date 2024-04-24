@@ -18,3 +18,5 @@ cp -rf nvim-linux64 /usr/lib/nvim
 link 
 ln -s /usr/lib/nvim/bin/nvim /usr/bin/nvim
 
+Tutorials:
+https://www.youtube.com/watch?v=E_8B_seg8AI&ab_channel=Fireship
