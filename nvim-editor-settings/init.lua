@@ -1,3 +1,4 @@
+-- Customiced by MaE
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -58,7 +59,6 @@ vim.opt.splitbelow = true
 --  and `:help 'listchars'`
 vim.opt.list = true
 vim.opt.listchars = { tab = "» ", trail = "·", nbsp = "␣" }
-
 -- Preview substitutions live, as you type!
 vim.opt.inccommand = "split"
 
@@ -66,7 +66,7 @@ vim.opt.inccommand = "split"
 vim.opt.cursorline = true
 
 -- Minimal number of screen lines to keep above and below the cursor.
-vim.opt.scrolloff = 10
+vim.opt.scrolloff = 15
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -88,9 +88,11 @@ vim.keymap.set("n", "tt", goto_prev_and_center, { desc = "Go to previous [D]iagn
 vim.keymap.set("n", "TT", goto_next_and_center, { desc = "Go to next [D]iagnostic message" })
 vim.keymap.set("n", "<leader>e", vim.diagnostic.open_float, { desc = "Show diagnostic [E]rror messages" })
 vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagnostic [Q]uickfix list" })
-
+-- Remap exit to command
+vim.api.nvim_set_keymap("i", "jk", "<ESC>", { noremap = true })
+-- Mark whole line
+vim.api.nvim_set_keymap("n", "vv", ":normal! V<CR>", { noremap = true })
 -- override line jump to zenter in the middle
-
 vim.keymap.set("n", "<C-u>", "<C-u>zz")
 vim.keymap.set("n", "<C-d>", "<C-d>zz")
 
@@ -142,6 +144,16 @@ if not vim.loop.fs_stat(lazypath) then
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
 
+vim.api.nvim_create_augroup("AutoFormat", {})
+
+vim.api.nvim_create_autocmd("BufWritePost", {
+  pattern = "*.py",
+  group = "AutoFormat",
+  callback = function()
+    vim.cmd "silent !black --quiet %"
+    vim.cmd "edit"
+  end,
+})
 -- [[ Configure and install plugins ]]
 --
 --  To check the current status of your plugins, run
@@ -272,6 +284,11 @@ require("lazy").setup({
       --  - Insert mode: <c-/>
       --  - Normal mode: ?
       --
+      local builtin = require "telescope.builtin"
+      vim.keymap.set("n", "<leader>ff", builtin.find_files, {})
+      vim.keymap.set("n", "<leader>fg", builtin.live_grep, {})
+      vim.keymap.set("n", "<leader>fb", builtin.buffers, {})
+      vim.keymap.set("n", "<leader>fh", builtin.help_tags, {})
       -- This opens a window that shows you all of the keymaps for the current
       -- Telescope picker. This is really useful to discover what Telescope can
       -- do as well as how to actually do it!
@@ -536,6 +553,8 @@ require("lazy").setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         "stylua", -- Used to format Lua code
+        "pyright", -- Python LSP
+        "black", -- Format Python PEP8
       })
       require("mason-tool-installer").setup { ensure_installed = ensure_installed }
 
@@ -553,7 +572,6 @@ require("lazy").setup({
       }
     end,
   },
-
   { -- Autoformat
     "stevearc/conform.nvim",
     lazy = false,
@@ -717,6 +735,8 @@ require("lazy").setup({
       vim.api.nvim_set_hl(0, "LineNr", { fg = "#edf516", bold = true })
       vim.api.nvim_set_hl(0, "LineNrBelow", { fg = "#51B3EC", bold = false })
       vim.api.nvim_set_hl(0, "Comment", { fg = "#009129", bold = false })
+      vim.api.nvim_set_hl(0, "DiagnosticDeprecated", { fg = "#8c6464", bold = false })
+      vim.api.nvim_set_hl(0, "DiagnosticUnnecessary", { fg = "#8c6464", bold = false })
       -- You can configure highlights by doing something like:
       vim.cmd.hi "Comment gui=none"
     end,
@@ -811,7 +831,7 @@ require("lazy").setup({
   --
   -- require 'kickstart.plugins.debug',
   -- require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require "kickstart.plugins.lint",
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
@@ -821,7 +841,7 @@ require("lazy").setup({
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  -- { import = 'custom.plugins' },
+  { import = "custom.plugins" },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
