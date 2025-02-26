@@ -1,4 +1,3 @@
--- Customiced by MaE
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -28,8 +27,10 @@ vim.opt.showmode = false
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
-vim.opt.clipboard = "unnamedplus"
-
+vim.schedule(function()
+  vim.opt.clipboard = "unnamedplus"
+end)
+--
 -- Enable break indent
 vim.opt.breakindent = true
 
@@ -54,6 +55,8 @@ vim.opt.timeoutlen = 300
 vim.opt.splitright = true
 vim.opt.splitbelow = true
 
+--use editorconfig
+vim.g.editorconfig = true
 -- Sets how neovim will display certain whitespace characters in the editor.
 --  See `:help 'list'`
 --  and `:help 'listchars'`
@@ -67,6 +70,13 @@ vim.opt.cursorline = true
 
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 15
+
+-- set Spelling
+vim.opt.spelllang = "en_us"
+vim.opt.spell = true
+
+vim.keymap.set("n", "<C-s>", "[s", { desc = "Go to next misspelled text" })
+vim.keymap.set("n", "<C-S>", "]s", { desc = "Go to previous misspelled text" })
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -144,16 +154,17 @@ if not vim.loop.fs_stat(lazypath) then
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
 
-vim.api.nvim_create_augroup("AutoFormat", {})
-
-vim.api.nvim_create_autocmd("BufWritePost", {
-  pattern = "*.py",
-  group = "AutoFormat",
-  callback = function()
-    vim.cmd "silent !black --quiet %"
-    vim.cmd "edit"
-  end,
-})
+-- WOMBAT
+-- vim.api.nvim_create_augroup("AutoFormat", {})
+--
+-- vim.api.nvim_create_autocmd("BufWritePost", {
+--   pattern = "*.py",
+--   group = "AutoFormat",
+--   callback = function()
+--     vim.cmd "silent !black --quiet %"
+--     vim.cmd "edit"
+--   end,
+-- })
 -- [[ Configure and install plugins ]]
 --
 --  To check the current status of your plugins, run
@@ -182,9 +193,6 @@ require("lazy").setup({
   { "numToStr/Comment.nvim", opts = {} },
 
   -- Here is a more advanced example where we pass configuration
-  -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
-  --    require('gitsigns').setup({ ... })
-  --
   -- See `:help gitsigns` to understand what the configuration keys do
   { -- Adds git related signs to the gutter, as well as utilities for managing changes
     "lewis6991/gitsigns.nvim",
@@ -250,7 +258,8 @@ require("lazy").setup({
     branch = "0.1.x",
     dependencies = {
       "nvim-lua/plenary.nvim",
-      { -- If encountering errors, see telescope-fzf-native README for installation instructions
+      {
+        -- If encountering errors, see telescope-fzf-native README for installation instructions
         "nvim-telescope/telescope-fzf-native.nvim",
 
         -- `build` is used to run some command when the plugin is installed/updated.
@@ -552,11 +561,15 @@ require("lazy").setup({
       -- for you, so that they are available from within Neovim.
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
-        "stylua", -- Used to format Lua code
-        "pyright", -- Python LSP
-        "black", -- Format Python PEP8
+        "stylua", 
+        "pyright", 
+        "prettier",
+        "black", 
+        "omnisharp",
+        "rust-analyzer",
+        "rustfmt",
       })
-      require("mason-tool-installer").setup { ensure_installed = ensure_installed }
+     require("mason-tool-installer").setup { ensure_installed = ensure_installed }
 
       require("mason-lspconfig").setup {
         handlers = {
@@ -570,16 +583,33 @@ require("lazy").setup({
           end,
         },
       }
+      require("lspconfig").omnisharp.setup {
+        on_attach = on_attach,
+        capabilities = capabilities,
+        cmd = { vim.fn.stdpath "data" .. "/mason/bin/omnisharp.cmd" },
+        enable_ms_build_load_projects_on_demand = false,
+        enable_editorconfig_support = true,
+        enable_roslyn_analysers = true,
+        enable_import_completion = true,
+        organize_imports_on_format = true,
+        enable_decompilation_support = true,
+        analyze_open_documents_only = false,
+        filetypes = { "cs", "vb", "csproj", "sln", "slnx", "props", "csx", "targets" },
+      }
+
     end,
   },
-  { -- Autoformat
+
+  {
+    -- Autoformat
     "stevearc/conform.nvim",
-    lazy = false,
+    event = { "BufWritePre" },
+    cmd = { "ConformInfo" },
     keys = {
       {
-        "<leader>f",
+        "<leader>p",
         function()
-          require("conform").format { async = true, lsp_fallback = true }
+          require("conform").format { async = true, lsp_format = "fallback" }
         end,
         mode = "",
         desc = "[F]ormat buffer",
@@ -592,19 +622,28 @@ require("lazy").setup({
         -- have a well standardized coding style. You can add additional
         -- languages here or re-enable it for the disabled ones.
         local disable_filetypes = { c = true, cpp = true }
+        local lsp_format_opt
+        if disable_filetypes[vim.bo[bufnr].filetype] then
+          lsp_format_opt = "never"
+        else
+          lsp_format_opt = "fallback"
+        end
         return {
           timeout_ms = 500,
-          lsp_fallback = not disable_filetypes[vim.bo[bufnr].filetype],
+          lsp_format = lsp_format_opt,
         }
       end,
-      formatters_by_ft = {
+      formatter_by_ft = {
         lua = { "stylua" },
-        -- Conform can also run multiple formatters sequentially
-        -- python = { "isort", "black" },
-        --
-        -- You can use a sub-list to tell conform to run *until* a formatter
-        -- is found.
-        -- javascript = { { "prettierd", "prettier" } },
+        python = { "black", "isort" },
+        rust = { "rustfmt", "rust_analyzer", lsp_format = "fallback" },
+        -- You can use 'stop_after_first' to run the first available formatter from the list
+        -- Use the "*" filetype to run formatters on all filetypes.
+        ["*"] = { "codespell" },
+        -- Use the "_" filetype to run formatters on filetypes that don't
+        -- have other formatters configured.
+        ["_"] = { "trim_whitespace" },
+        -- javascript = { "prettierd", "prettier", stop_after_first = true },
       },
     },
   },
@@ -658,16 +697,15 @@ require("lazy").setup({
           end,
         },
         completion = { completeopt = "menu,menuone,noinsert" },
-
         -- For an understanding of why these mappings were
         -- chosen, you will need to read `:help ins-completion`
         --
         -- No, but seriously. Please read `:help ins-completion`, it is really good!
         mapping = cmp.mapping.preset.insert {
           -- Select the [n]ext item
-          ["<C-n>"] = cmp.mapping.select_next_item(),
+          --  ["<C-n>"] = cmp.mapping.select_next_item(),
           -- Select the [p]revious item
-          ["<C-p>"] = cmp.mapping.select_prev_item(),
+          --- ["<C-m>"] = cmp.mapping.select_prev_item(),
 
           -- Scroll the documentation window [b]ack / [f]orward
           ["<C-b>"] = cmp.mapping.scroll_docs(-4),
@@ -680,9 +718,9 @@ require("lazy").setup({
 
           -- If you prefer more traditional completion keymaps,
           -- you can uncomment the following lines
-          --['<CR>'] = cmp.mapping.confirm { select = true },
-          --['<Tab>'] = cmp.mapping.select_next_item(),
-          --['<S-Tab>'] = cmp.mapping.select_prev_item(),
+          ["<CR>"] = cmp.mapping.confirm { select = true },
+          ["<Tab>"] = cmp.mapping.select_next_item(),
+          ["<S-Tab>"] = cmp.mapping.select_prev_item(),
 
           -- Manually trigger a completion from nvim-cmp.
           --  Generally you don't need this, because nvim-cmp will display
@@ -741,7 +779,6 @@ require("lazy").setup({
       vim.cmd.hi "Comment gui=none"
     end,
   },
-
   -- Highlight todo, notes, etc in comments
   {
     "folke/todo-comments.nvim",
@@ -834,14 +871,18 @@ require("lazy").setup({
   require "kickstart.plugins.lint",
   -- require 'kickstart.plugins.autopairs',
   -- require 'kickstart.plugins.neo-tree',
-  -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
-
+  require "kickstart.plugins.gitsigns", -- adds gitsigns recommend keymaps
   -- NOTE: The import below can automatically add your own plugins, configuration, etc from `lua/custom/plugins/*.lua`
   --    This is the easiest way to modularize your config.
   --
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
-  { import = "custom.plugins" },
+
+  -- options to `gitsigns.nvim`. This is equivalent to the following Lua:
+  -- require("gitsigns").setup {
+  --   current_line_blame = true,
+  -- },
+  --{ import = "custom.plugins" },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
@@ -863,6 +904,5 @@ require("lazy").setup({
     },
   },
 })
-
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
