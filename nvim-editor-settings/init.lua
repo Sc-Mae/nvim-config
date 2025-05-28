@@ -27,9 +27,9 @@ vim.opt.showmode = false
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
 --  See `:help 'clipboard'`
-vim.schedule(function()
-  vim.opt.clipboard = "unnamedplus"
-end)
+-- vim.schedule(function()
+--   vim.opt.clipboard = "unnamedplus"
+-- end)
 --
 -- Enable break indent
 vim.opt.breakindent = true
@@ -93,7 +93,7 @@ local function goto_next_and_center()
   vim.diagnostic.goto_next()
   vim.cmd "norm! zz"
 end
--- Diagnostic keymaps
+-- Diagnostic ]eymaps
 vim.keymap.set("n", "tt", goto_prev_and_center, { desc = "Go to previous [D]iagnostic message" })
 vim.keymap.set("n", "TT", goto_next_and_center, { desc = "Go to next [D]iagnostic message" })
 vim.keymap.set("n", "<leader>e", vim.diagnostic.open_float, { desc = "Show diagnostic [E]rror messages" })
@@ -153,18 +153,6 @@ if not vim.loop.fs_stat(lazypath) then
   vim.fn.system { "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath }
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
-
--- WOMBAT
--- vim.api.nvim_create_augroup("AutoFormat", {})
---
--- vim.api.nvim_create_autocmd("BufWritePost", {
---   pattern = "*.py",
---   group = "AutoFormat",
---   callback = function()
---     vim.cmd "silent !black --quiet %"
---     vim.cmd "edit"
---   end,
--- })
 -- [[ Configure and install plugins ]]
 --
 --  To check the current status of your plugins, run
@@ -191,6 +179,92 @@ require("lazy").setup({
 
   -- "gc" to comment visual regions/lines
   { "numToStr/Comment.nvim", opts = {} },
+  {
+    "ldelossa/gh.nvim",
+    dependencies = {
+      {
+        "ldelossa/litee.nvim",
+        config = function()
+          require("litee.lib").setup()
+        end,
+      },
+    },
+    config = function()
+      require("litee.gh").setup()
+
+      local wk = require "which-key"
+      wk.register {
+        ["<leader>g"] = { name = "Git" },
+        ["<leader>gh"] = { name = "GitHub" },
+
+        -- Commits
+        ["<leader>ghc"] = { name = "Commits" },
+        ["<leader>ghcc"] = { "<cmd>GHCloseCommit<cr>", "Close Commit" },
+        ["<leader>ghce"] = { "<cmd>GHExpandCommit<cr>", "Expand Commit" },
+        ["<leader>ghco"] = { "<cmd>GHOpenToCommit<cr>", "Open To Commit" },
+        ["<leader>ghcp"] = { "<cmd>GHPopOutCommit<cr>", "Pop Out Commit" },
+        ["<leader>ghcz"] = { "<cmd>GHCollapseCommit<cr>", "Collapse Commit" },
+
+        -- Issues
+        ["<leader>ghi"] = { name = "Issues" },
+        ["<leader>ghip"] = { "<cmd>GHPreviewIssue<cr>", "Preview Issue" },
+
+        -- Litee Panel
+        ["<leader>ghl"] = { name = "Litee Panel" },
+        ["<leader>ghlt"] = { "<cmd>LTPanel<cr>", "Toggle Panel" },
+
+        -- Pull Requests
+        ["<leader>ghp"] = { name = "Pull Request" },
+        ["<leader>ghpc"] = { "<cmd>GHClosePR<cr>", "Close PR" },
+        ["<leader>ghpd"] = { "<cmd>GHPRDetails<cr>", "PR Details" },
+        ["<leader>ghpe"] = { "<cmd>GHExpandPR<cr>", "Expand PR" },
+        ["<leader>ghpo"] = { "<cmd>GHOpenPR<cr>", "Open PR" },
+        ["<leader>ghpp"] = { "<cmd>GHPopOutPR<cr>", "Pop Out PR" },
+        ["<leader>ghpr"] = { "<cmd>GHRefreshPR<cr>", "Refresh PR" },
+        ["<leader>ghpt"] = { "<cmd>GHOpenToPR<cr>", "Open To PR" },
+        ["<leader>ghpz"] = { "<cmd>GHCollapsePR<cr>", "Collapse PR" },
+        ["<leader>ghpn"] = { "<cmd>GHCreatePR<cr>", "New PR" },
+
+        -- Reviews
+        ["<leader>ghr"] = { name = "Review" },
+        ["<leader>ghrb"] = { "<cmd>GHStartReview<cr>", "Start Review" },
+        ["<leader>ghrc"] = { "<cmd>GHCloseReview<cr>", "Close Review" },
+        ["<leader>ghrd"] = { "<cmd>GHDeleteReview<cr>", "Delete Review" },
+        ["<leader>ghre"] = { "<cmd>GHExpandReview<cr>", "Expand Review" },
+        ["<leader>ghrs"] = { "<cmd>GHSubmitReview<cr>", "Submit Review" },
+        ["<leader>ghrz"] = { "<cmd>GHCollapseReview<cr>", "Collapse Review" },
+
+        -- Threads
+        ["<leader>ght"] = { name = "Threads" },
+        ["<leader>ghtc"] = { "<cmd>GHCreateThread<cr>", "Create Thread" },
+        ["<leader>ghtn"] = { "<cmd>GHNextThread<cr>", "Next Thread" },
+        ["<leader>ghtt"] = { "<cmd>GHToggleThread<cr>", "Toggle Thread" },
+      }
+    end,
+  },
+
+  {
+    "NeogitOrg/neogit",
+    dependencies = {
+      "nvim-lua/plenary.nvim", -- Required
+      "sindrets/diffview.nvim", -- Optional - Diff integration
+      "nvim-telescope/telescope.nvim", -- Optional - Telescope integration
+    },
+    cmd = "Neogit", -- Lazy-load on :Neogit
+    keys = {
+      { "<leader>gg", "<cmd>Neogit<CR>", desc = "Open Neogit" },
+    },
+    config = function()
+      local neogit = require "neogit"
+      neogit.setup {
+        disable_hint = true,
+        integrations = {
+          diffview = true,
+          telescope = true,
+        },
+      }
+    end,
+  },
 
   -- Here is a more advanced example where we pass configuration
   -- See `:help gitsigns` to understand what the configuration keys do
@@ -206,21 +280,6 @@ require("lazy").setup({
       },
     },
   },
-
-  -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
-  --
-  -- This is often very useful to both group configuration, as well as handle
-  -- lazy loading plugins that don't need to be loaded immediately at startup.
-  --
-  -- For example, in the following configuration, we use:
-  --  event = 'VimEnter'
-  --
-  -- which loads which-key before all the UI elements are loaded. Events can be
-  -- normal autocommands events (`:help autocmd-events`).
-  --
-  -- Then, because we use the `config` key, the configuration only runs
-  -- after the plugin has been loaded:
-  --  config = function() ... end
 
   { -- Useful plugin to show you pending keybinds.
     "folke/which-key.nvim",
@@ -293,11 +352,6 @@ require("lazy").setup({
       --  - Insert mode: <c-/>
       --  - Normal mode: ?
       --
-      local builtin = require "telescope.builtin"
-      vim.keymap.set("n", "<leader>ff", builtin.find_files, {})
-      vim.keymap.set("n", "<leader>fg", builtin.live_grep, {})
-      vim.keymap.set("n", "<leader>fb", builtin.buffers, {})
-      vim.keymap.set("n", "<leader>fh", builtin.help_tags, {})
       -- This opens a window that shows you all of the keymaps for the current
       -- Telescope picker. This is really useful to discover what Telescope can
       -- do as well as how to actually do it!
@@ -308,12 +362,21 @@ require("lazy").setup({
         -- You can put your default mappings / updates / etc. in here
         --  All the info you're looking for is in `:help telescope.setup()`
         --
-        -- defaults = {
-        --   mappings = {
-        --     i = { ['<c-enter>'] = 'to_fuzzy_refine' },
-        --   },
-        -- },
-        -- pickers = {}
+        defaults = {
+          file_ignore_patterns = {
+            "^%.git/",
+            "%.git$",
+          },
+        },
+        pickers = {
+          find_files = {
+            hidden = true,
+            file_ignore_patterns = {
+              "^%.git/",
+              "%.git$",
+            },
+          },
+        },
         extensions = {
           ["ui-select"] = {
             require("telescope.themes").get_dropdown(),
@@ -329,13 +392,15 @@ require("lazy").setup({
       local builtin = require "telescope.builtin"
       vim.keymap.set("n", "<leader>sh", builtin.help_tags, { desc = "[S]earch [H]elp" })
       vim.keymap.set("n", "<leader>sk", builtin.keymaps, { desc = "[S]earch [K]eymaps" })
-      vim.keymap.set("n", "<leader>sf", builtin.find_files, { desc = "[S]earch [F]iles" })
+      vim.keymap.set("n", "<leader>ff", builtin.find_files, {})
+      vim.keymap.set("n", "<leader>fb", builtin.git_branches, { desc = "Git Branches" })
+      vim.keymap.set("n", "<leader>fs", builtin.git_status, { desc = "Git Status" })
+      vim.keymap.set("n", "<leader>fg", builtin.live_grep, {})
+      vim.keymap.set("n", "<leader>fh", builtin.help_tags, {})
       vim.keymap.set("n", "<leader>ss", builtin.builtin, { desc = "[S]earch [S]elect Telescope" })
-      vim.keymap.set("n", "<leader>sw", builtin.grep_string, { desc = "[S]earch current [W]ord" })
-      vim.keymap.set("n", "<leader>sg", builtin.live_grep, { desc = "[S]earch by [G]rep" })
-      vim.keymap.set("n", "<leader>sd", builtin.diagnostics, { desc = "[S]earch [D]iagnostics" })
-      vim.keymap.set("n", "<leader>sr", builtin.resume, { desc = "[S]earch [R]esume" })
-      vim.keymap.set("n", "<leader>s.", builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
+      vim.keymap.set("n", "<leader>fw", builtin.grep_string, { desc = "[S]earch current [W]ord" })
+      vim.keymap.set("n", "<leader>fd", builtin.diagnostics, { desc = "[S]earch [D]iagnostics" })
+      vim.keymap.set("n", "<leader>f.", builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
       vim.keymap.set("n", "<leader><leader>", builtin.buffers, { desc = "[ ] Find existing buffers" })
 
       -- Slightly advanced example of overriding default behavior and theme
@@ -561,28 +626,33 @@ require("lazy").setup({
       -- for you, so that they are available from within Neovim.
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
-        "stylua", 
-        "pyright", 
+        "stylua",
+        "pyright",
         "prettier",
-        "black", 
+        "black",
+        "ruff",
+        "html-lsp",
         "omnisharp",
         "rust-analyzer",
         "rustfmt",
       })
-     require("mason-tool-installer").setup { ensure_installed = ensure_installed }
+      require("mason-tool-installer").setup { ensure_installed = ensure_installed }
 
       require("mason-lspconfig").setup {
+        ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
+        automatic_installation = false,
         handlers = {
           function(server_name)
             local server = servers[server_name] or {}
             -- This handles overriding only values explicitly passed
             -- by the server configuration above. Useful when disabling
-            -- certain features of an LSP (for example, turning off formatting for tsserver)
+            -- certain features of an LSP (for example, turning off formatting for ts_ls)
             server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
             require("lspconfig")[server_name].setup(server)
           end,
         },
       }
+
       require("lspconfig").omnisharp.setup {
         on_attach = on_attach,
         capabilities = capabilities,
@@ -596,54 +666,25 @@ require("lazy").setup({
         analyze_open_documents_only = false,
         filetypes = { "cs", "vb", "csproj", "sln", "slnx", "props", "csx", "targets" },
       }
-
     end,
   },
-
   {
-    -- Autoformat
     "stevearc/conform.nvim",
-    event = { "BufWritePre" },
-    cmd = { "ConformInfo" },
-    keys = {
-      {
-        "<leader>p",
-        function()
-          require("conform").format { async = true, lsp_format = "fallback" }
-        end,
-        mode = "",
-        desc = "[F]ormat buffer",
-      },
-    },
+    event = "BufWritePre", -- uncomment for format on save
     opts = {
-      notify_on_error = false,
-      format_on_save = function(bufnr)
-        -- Disable "format_on_save lsp_fallback" for languages that don't
-        -- have a well standardized coding style. You can add additional
-        -- languages here or re-enable it for the disabled ones.
-        local disable_filetypes = { c = true, cpp = true }
-        local lsp_format_opt
-        if disable_filetypes[vim.bo[bufnr].filetype] then
-          lsp_format_opt = "never"
-        else
-          lsp_format_opt = "fallback"
-        end
-        return {
-          timeout_ms = 500,
-          lsp_format = lsp_format_opt,
-        }
-      end,
-      formatter_by_ft = {
+      formatters_by_ft = {
         lua = { "stylua" },
-        python = { "black", "isort" },
-        rust = { "rustfmt", "rust_analyzer", lsp_format = "fallback" },
-        -- You can use 'stop_after_first' to run the first available formatter from the list
-        -- Use the "*" filetype to run formatters on all filetypes.
-        ["*"] = { "codespell" },
-        -- Use the "_" filetype to run formatters on filetypes that don't
-        -- have other formatters configured.
-        ["_"] = { "trim_whitespace" },
-        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+        css = { "prettier" },
+        html = { "prettier" },
+        javascript = { "prettier" },
+        typescript = { "prettier" },
+        typescriptreact = { "prettier" },
+      },
+
+      format_on_save = {
+        -- These options will be passed to conform.format()
+        timeout_ms = 5000,
+        lsp_fallback = true,
       },
     },
   },
@@ -828,7 +869,7 @@ require("lazy").setup({
     "nvim-treesitter/nvim-treesitter",
     build = ":TSUpdate",
     opts = {
-      ensure_installed = { "bash", "c", "html", "lua", "luadoc", "markdown", "vim", "vimdoc" },
+      ensure_installed = { "python", "bash", "c", "html", "lua", "luadoc", "markdown", "vim", "vimdoc" },
       -- Autoinstall languages that are not installed
       auto_install = true,
       highlight = {
