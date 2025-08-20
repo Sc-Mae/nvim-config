@@ -93,6 +93,10 @@ local function goto_next_and_center()
   vim.diagnostic.goto_next()
   vim.cmd "norm! zz"
 end
+vim.keymap.set("n", "ü", "ea", { desc = "insert on word end" })
+
+vim.keymap.set("n", "<leader>ft", ":Explore<ENTER>")
+
 -- Diagnostic ]eymaps
 vim.keymap.set("n", "tt", goto_prev_and_center, { desc = "Go to previous [D]iagnostic message" })
 vim.keymap.set("n", "TT", goto_next_and_center, { desc = "Go to next [D]iagnostic message" })
