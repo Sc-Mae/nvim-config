@@ -26,6 +26,46 @@ vim.opt.mouse = "a"
 -- Don't show the mode, since it's already in the status line
 vim.opt.showmode = false
 
+-- When Neovim runs on a remote host over SSH, use OSC52 so yanks can reach the
+-- local system clipboard through the terminal connection.
+if (vim.env.SSH_TTY or vim.env.SSH_CONNECTION) and vim.g.clipboard == nil then
+  local osc52 = require "vim.ui.clipboard.osc52"
+  local clipboard_cache = {
+    ["+"] = { lines = {}, regtype = "v" },
+    ["*"] = { lines = {}, regtype = "v" },
+  }
+
+  local function copy(register)
+    local osc52_copy = osc52.copy(register)
+    return function(lines, regtype)
+      clipboard_cache[register] = {
+        lines = vim.deepcopy(lines),
+        regtype = regtype,
+      }
+      osc52_copy(lines, regtype)
+    end
+  end
+
+  local function paste(register)
+    return function()
+      local cached = clipboard_cache[register]
+      return vim.deepcopy(cached.lines), cached.regtype
+    end
+  end
+
+  vim.g.clipboard = {
+    name = "OSC52 (copy only)",
+    copy = {
+      ["+"] = copy "+",
+      ["*"] = copy "*",
+    },
+    paste = {
+      ["+"] = paste "+",
+      ["*"] = paste "*",
+    },
+  }
+end
+
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
 -- See `:help 'clipboard'`
