@@ -5,7 +5,9 @@ vim.g.mapleader = " "
 vim.g.maplocalleader = " "
 
 -- Set to true if you have a Nerd Font installed and selected in the terminal
-vim.g.have_nerd_font = false
+vim.g.have_nerd_font = true
+
+require "config.compat"
 
 -- [[ Setting options ]]
 -- See `:help vim.opt`
@@ -26,10 +28,10 @@ vim.opt.showmode = false
 
 -- Sync clipboard between OS and Neovim.
 --  Remove this option if you want your OS clipboard to remain independent.
---  See `:help 'clipboard'`
--- vim.schedule(function()
---   vim.opt.clipboard = "unnamedplus"
--- end)
+-- See `:help 'clipboard'`
+vim.schedule(function()
+  vim.opt.clipboard = "unnamedplus"
+end)
 --
 -- Enable break indent
 vim.opt.breakindent = true
@@ -75,8 +77,8 @@ vim.opt.scrolloff = 15
 vim.opt.spelllang = "en_us"
 vim.opt.spell = true
 
-vim.keymap.set("n", "<C-s>", "[s", { desc = "Go to next misspelled text" })
-vim.keymap.set("n", "<C-S>", "]s", { desc = "Go to previous misspelled text" })
+vim.keymap.set("n", "<C-s>", "]s", { desc = "Go to next misspelled text" })
+vim.keymap.set("n", "<leader>sp", "[s", { desc = "Go to previous misspelled text" })
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -86,16 +88,30 @@ vim.opt.hlsearch = true
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>")
 
 local function goto_prev_and_center()
-  vim.diagnostic.goto_prev()
+  vim.diagnostic.jump { count = -1 }
   vim.cmd "norm! zz"
 end
 local function goto_next_and_center()
-  vim.diagnostic.goto_next()
+  vim.diagnostic.jump { count = 1 }
   vim.cmd "norm! zz"
 end
 vim.keymap.set("n", "ü", "ea", { desc = "insert on word end" })
 
-vim.keymap.set("n", "<leader>ft", ":Explore<ENTER>")
+-- Handle File explorer
+vim.keymap.set("n", "<leader>ft", "<cmd>Explore<CR>", { desc = "Open file explorer" })
+vim.keymap.set("n", "<leader>nf", function()
+  local dir = vim.fn.expand "%:p:h"
+  if vim.fn.isdirectory(dir) == 0 then
+    dir = vim.fn.getcwd()
+  end
+
+  local name = vim.fn.input("New file: ", dir .. "/")
+  if name == "" then
+    return
+  end
+
+  vim.cmd("edit " .. vim.fn.fnameescape(name))
+end, { desc = "Create new file in current buffer directory" })
 
 -- Diagnostic ]eymaps
 vim.keymap.set("n", "tt", goto_prev_and_center, { desc = "Go to previous [D]iagnostic message" })
@@ -103,15 +119,15 @@ vim.keymap.set("n", "TT", goto_next_and_center, { desc = "Go to next [D]iagnosti
 vim.keymap.set("n", "<leader>e", vim.diagnostic.open_float, { desc = "Show diagnostic [E]rror messages" })
 vim.keymap.set("n", "<leader>q", vim.diagnostic.setloclist, { desc = "Open diagnostic [Q]uickfix list" })
 -- Remap exit to command
-vim.api.nvim_set_keymap("i", "jk", "<ESC>", { noremap = true })
+vim.keymap.set("i", "jk", "<Esc>", { desc = "Exit insert mode" })
 -- Mark whole line
-vim.api.nvim_set_keymap("n", "vv", ":normal! V<CR>", { noremap = true })
+vim.keymap.set("n", "vv", "V", { desc = "Select current line" })
 -- override line jump to zenter in the middle
 vim.keymap.set("n", "<C-u>", "<C-u>zz")
 vim.keymap.set("n", "<C-d>", "<C-d>zz")
 
 vim.keymap.set("n", "n", "nzz")
-vim.keymap.set("n", "N", "nzz")
+vim.keymap.set("n", "N", "Nzz")
 -- Exit terminal mode in the builtin terminal with a shortcut that is a bit easier
 -- for people to discover. Otherwise, you normally need to press <C-\><C-n>, which
 -- is not what someone will guess without a bit more experience.
@@ -152,9 +168,12 @@ vim.api.nvim_create_autocmd("TextYankPost", {
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
 local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
-if not vim.loop.fs_stat(lazypath) then
+if not vim.uv.fs_stat(lazypath) then
   local lazyrepo = "https://github.com/folke/lazy.nvim.git"
   vim.fn.system { "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath }
+  if vim.v.shell_error ~= 0 then
+    error("Failed to clone lazy.nvim from " .. lazyrepo)
+  end
 end ---@diagnostic disable-next-line: undefined-field
 vim.opt.rtp:prepend(lazypath)
 -- [[ Configure and install plugins ]]
@@ -588,11 +607,37 @@ require("lazy").setup({
       --  - capabilities (table): Override fields in capabilities. Can be used to disable certain LSP features.
       --  - settings (table): Override the default settings passed when initializing the server.
       --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
+      local function resolve_omnisharp_cmd()
+        local mason_omnisharp = vim.fs.joinpath(vim.fn.stdpath "data", "mason", "packages", "omnisharp", "OmniSharp")
+        if vim.fn.filereadable(mason_omnisharp) == 1 and vim.fn.executable(mason_omnisharp) == 1 then
+          return { mason_omnisharp }
+        end
+
+        local executable = vim.fn.exepath "OmniSharp"
+        if executable ~= "" then
+          return { executable }
+        end
+
+        executable = vim.fn.exepath "omnisharp"
+        if executable ~= "" then
+          return { executable }
+        end
+
+        local dll = vim.fs.joinpath(vim.fn.stdpath "data", "mason", "packages", "omnisharp", "libexec", "OmniSharp.dll")
+        if vim.fn.filereadable(dll) == 1 and vim.fn.executable "dotnet" == 1 then
+          return { "dotnet", dll }
+        end
+
+        return nil
+      end
+
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
-        -- rust_analyzer = {},
+        pyright = {},
+        rust_analyzer = {},
+        html = {},
+        ruff = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
         -- Some languages (like typescript) have entire language plugins that can be useful:
@@ -616,6 +661,17 @@ require("lazy").setup({
             },
           },
         },
+        omnisharp = {
+          cmd = resolve_omnisharp_cmd(),
+          enable_ms_build_load_projects_on_demand = false,
+          enable_editorconfig_support = true,
+          enable_roslyn_analysers = true,
+          enable_import_completion = true,
+          organize_imports_on_format = true,
+          enable_decompilation_support = true,
+          analyze_open_documents_only = false,
+          filetypes = { "cs", "vb", "csproj", "sln", "slnx", "props", "csx", "targets" },
+        },
       }
 
       -- Ensure the servers and tools above are installed
@@ -631,45 +687,23 @@ require("lazy").setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         "stylua",
-        "pyright",
         "prettier",
         "black",
-        "ruff",
         "html-lsp",
-        "omnisharp",
-        "rust-analyzer",
         "rustfmt",
       })
       require("mason-tool-installer").setup { ensure_installed = ensure_installed }
 
       require("mason-lspconfig").setup {
-        ensure_installed = {}, -- explicitly set to an empty table (Kickstart populates installs via mason-tool-installer)
         automatic_installation = false,
-        handlers = {
-          function(server_name)
-            local server = servers[server_name] or {}
-            -- This handles overriding only values explicitly passed
-            -- by the server configuration above. Useful when disabling
-            -- certain features of an LSP (for example, turning off formatting for ts_ls)
-            server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
-            require("lspconfig")[server_name].setup(server)
-          end,
-        },
       }
 
-      require("lspconfig").omnisharp.setup {
-        on_attach = on_attach,
-        capabilities = capabilities,
-        cmd = { vim.fn.stdpath "data" .. "/mason/bin/omnisharp.cmd" },
-        enable_ms_build_load_projects_on_demand = false,
-        enable_editorconfig_support = true,
-        enable_roslyn_analysers = true,
-        enable_import_completion = true,
-        organize_imports_on_format = true,
-        enable_decompilation_support = true,
-        analyze_open_documents_only = false,
-        filetypes = { "cs", "vb", "csproj", "sln", "slnx", "props", "csx", "targets" },
-      }
+      for server_name, server in pairs(servers) do
+        server.capabilities = vim.tbl_deep_extend("force", {}, capabilities, server.capabilities or {})
+        if server_name ~= "omnisharp" or server.cmd ~= nil then
+          require("lspconfig")[server_name].setup(server)
+        end
+      end
     end,
   },
   {
@@ -875,7 +909,7 @@ require("lazy").setup({
     opts = {
       ensure_installed = { "python", "bash", "c", "html", "lua", "luadoc", "markdown", "vim", "vimdoc" },
       -- Autoinstall languages that are not installed
-      auto_install = true,
+      auto_install = false,
       highlight = {
         enable = true,
         -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
@@ -887,6 +921,13 @@ require("lazy").setup({
     },
     config = function(_, opts)
       -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
+      local parser_dir = vim.fs.joinpath(vim.fn.stdpath "config", ".cache", "treesitter")
+      vim.fn.mkdir(parser_dir, "p")
+      vim.opt.runtimepath:append(parser_dir)
+      opts.parser_install_dir = parser_dir
+      if #vim.api.nvim_list_uis() == 0 then
+        opts.ensure_installed = {}
+      end
 
       -- Prefer git instead of curl in order to improve connectivity in some environments
       require("nvim-treesitter.install").prefer_git = true
